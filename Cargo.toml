@@ -1,10 +1,10 @@
 [package]
-name = "weylus"
+name = "weylus_osu"
 version = "0.11.4"
 authors = ["HMH <henry@freedesk.net>"]
 license = "AGPL-3.0-or-later"
 edition = "2021"
-description = "Use your iPad or Android tablet as graphic tablet."
+description = "Low-latency osu! tablet stylus driver with custom area mapping."
 
 [dependencies]
 autopilot = { git = "https://github.com/H-M-H/autopilot-rs.git", rev = "63eed09c715bfb665bb23172a3930a528e11691c" }
@@ -14,7 +14,7 @@ clap = { version = "4.5.18", features = ["derive"] }
 clap_complete = "4.5.29"
 dirs = "^5.0"
 fastwebsockets = { version = "0.8.0", features = ["upgrade", "unstable-split"] }
-fltk = { version = "^1.5", features = ["use-wayland"] }
+fltk = { version = "^1.5", features = ["use-wayland", "fltk-bundled"] }
 fltk-theme = "^0.7.9"
 handlebars = "^6.1"
 http-body-util = "0.1.2"
@@ -62,17 +62,17 @@ ffmpeg-system = []
 va-static = []
 
 [package.metadata.bundle]
-name = "Weylus"
-identifier = "io.github.h-m-h.weylus"
+name = "Weylus_Osu"
+identifier = "io.github.h-m-h.weylus-osu"
 
 [package.metadata.deb]
-name = "Weylus"
+name = "Weylus_Osu"
 section = "graphics"
 priority = "optional"
 assets = [
-    ["target/release/weylus", "usr/bin/weylus", "755"],
-    ["weylus.desktop", "usr/share/applications/weylus.desktop", "755"],
-    ["Readme.md", "usr/share/doc/weylus/README", "644"],
+    ["target/release/weylus_osu", "usr/bin/weylus_osu", "755"],
+    ["weylus.desktop", "usr/share/applications/weylus_osu.desktop", "755"],
+    ["Readme.md", "usr/share/doc/weylus_osu/README", "644"],
 ]
 
 [profile.release]

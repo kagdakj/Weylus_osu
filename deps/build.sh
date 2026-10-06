@@ -44,9 +44,6 @@ else
     if [ "$TARGET_OS" == "linux" ]; then
         export FFMPEG_EXTRA_ARGS="--enable-nvenc \
             --enable-ffnvcodec \
-            --enable-cuda-llvm \
-            --enable-vaapi \
-            --enable-libdrm \
             --enable-xlib"
     fi
     if [ "$TARGET_OS" == "macos" ]; then
@@ -64,7 +61,7 @@ fi
 ./x264.sh
 if [ "$TARGET_OS" == "linux" ]; then
     ./nv-codec-headers.sh
-    ./libva.sh
+    # ./libva.sh
 fi
 if [ "$TARGET_OS" == "windows" ]; then
     ./nv-codec-headers.sh

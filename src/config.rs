@@ -69,7 +69,7 @@ impl ThemeType {
 }
 
 #[derive(Serialize, Deserialize, Parser, Debug, Clone)]
-#[command(version, about, long_about = None)]
+#[command(version, about = "Low-latency osu! tablet stylus driver.", long_about = None)]
 pub struct Config {
     #[arg(long, help = "Access code")]
     pub access_code: Option<String>,
@@ -101,12 +101,12 @@ pub struct Config {
     )]
     #[serde(default)]
     pub try_mediafoundation: bool,
-    #[arg(long, help = "Start Weylus server immediately on program start.")]
+    #[arg(long, help = "Start Weylus_Osu server immediately on program start.")]
     #[serde(default)]
     pub auto_start: bool,
     #[arg(long, help = "Gui Theme")]
     pub gui_theme: Option<ThemeType>,
-    #[arg(long, help = "Run Weylus without gui and start immediately.")]
+    #[arg(long, help = "Run Weylus_Osu without gui and start immediately.")]
     #[serde(default)]
     pub no_gui: bool,
     #[cfg(target_os = "linux")]
@@ -114,32 +114,32 @@ pub struct Config {
     #[serde(default)]
     pub wayland_support: bool,
 
-    #[arg(long, help = "Print template of index.html served by Weylus.")]
+    #[arg(long, help = "Print template of index.html served by Weylus_Osu.")]
     #[serde(skip)]
     pub print_index_html: bool,
-    #[arg(long, help = "Print access.html served by Weylus.")]
+    #[arg(long, help = "Print access.html served by Weylus_Osu.")]
     #[serde(skip)]
     pub print_access_html: bool,
-    #[arg(long, help = "Print style.css served by Weylus.")]
+    #[arg(long, help = "Print style.css served by Weylus_Osu.")]
     #[serde(skip)]
     pub print_style_css: bool,
-    #[arg(long, help = "Print lib.js served by Weylus.")]
+    #[arg(long, help = "Print lib.js served by Weylus_Osu.")]
     #[serde(skip)]
     pub print_lib_js: bool,
 
     #[arg(
         long,
-        help = "Use custom template of index.html to be served by Weylus."
+        help = "Use custom template of index.html to be served by Weylus_Osu."
     )]
     #[serde(skip)]
     pub custom_index_html: Option<PathBuf>,
-    #[arg(long, help = "Use custom access.html to be served by Weylus.")]
+    #[arg(long, help = "Use custom access.html to be served by Weylus_Osu.")]
     #[serde(skip)]
     pub custom_access_html: Option<PathBuf>,
-    #[arg(long, help = "Use custom style.css to be served by Weylus.")]
+    #[arg(long, help = "Use custom style.css to be served by Weylus_Osu.")]
     #[serde(skip)]
     pub custom_style_css: Option<PathBuf>,
-    #[arg(long, help = "Use custom lib.js to be served by Weylus.")]
+    #[arg(long, help = "Use custom lib.js to be served by Weylus_Osu.")]
     #[serde(skip)]
     pub custom_lib_js: Option<PathBuf>,
 
@@ -150,8 +150,8 @@ pub struct Config {
 
 pub fn read_config() -> Option<Config> {
     if let Some(mut config_path) = dirs::config_dir() {
-        config_path.push("weylus");
-        config_path.push("weylus.toml");
+        config_path.push("weylus_osu");
+        config_path.push("weylus_osu.toml");
         match fs::read_to_string(&config_path) {
             Ok(s) => match toml::from_str(&s) {
                 Ok(c) => Some(c),
@@ -178,14 +178,14 @@ pub fn read_config() -> Option<Config> {
 pub fn write_config(conf: &Config) {
     match dirs::config_dir() {
         Some(mut config_path) => {
-            config_path.push("weylus");
+            config_path.push("weylus_osu");
             if !config_path.exists() {
                 if let Err(err) = fs::create_dir_all(&config_path) {
                     warn!("Failed create directory for configuration: {}", err);
                     return;
                 }
             }
-            config_path.push("weylus.toml");
+            config_path.push("weylus_osu.toml");
             if let Err(err) = fs::write(
                 config_path,
                 &toml::to_string_pretty(&conf).expect("Failed to encode config to toml."),

@@ -107,6 +107,199 @@ class CustomInputAreas {
     pen: Rect;
 }
 
+class MappingBox {
+    x: number = 0.1;
+    y: number = 0.1;
+    w: number = 0.8;
+    h: number = 0.8;
+    editing: boolean = false;
+    enabled: boolean = true;
+    overlay: HTMLDivElement;
+    handles: HTMLDivElement[] = [];
+    label: HTMLDivElement;
+    onUpdate: () => void;
+
+    constructor(onUpdate: () => void) {
+        this.onUpdate = onUpdate;
+        this.createOverlay();
+    }
+
+    getMainRect(): DOMRect {
+        return (document.getElementById("main") || document.body).getBoundingClientRect();
+    }
+
+    createOverlay() {
+        this.overlay = document.createElement("div");
+        this.overlay.id = "mapping_overlay";
+        this.overlay.className = "hidden";
+
+        this.label = document.createElement("div");
+        this.label.id = "mapping_label";
+        this.overlay.appendChild(this.label);
+
+        // Add handles
+        const positions = ["tl", "tr", "bl", "br"];
+        positions.forEach(pos => {
+            const handle = document.createElement("div");
+            handle.className = `mapping_handle ${pos}`;
+            this.overlay.appendChild(handle);
+            this.handles.push(handle);
+            this.initHandleDrag(handle, pos);
+        });
+
+        this.initBoxDrag();
+        // Append to main so it is positioned within the input area
+        const main = document.getElementById("main") || document.body;
+        main.appendChild(this.overlay);
+    }
+
+    updateDOM() {
+        if (!this.enabled) {
+            this.overlay.className = "hidden";
+        } else if (this.editing) {
+            this.overlay.className = "editing";
+        } else {
+            this.overlay.className = "not-editing";
+        }
+
+        // Position relative to the main element (100%/100% so just use percentages)
+        this.overlay.style.left = `${this.x * 100}%`;
+        this.overlay.style.top = `${this.y * 100}%`;
+        this.overlay.style.width = `${this.w * 100}%`;
+        this.overlay.style.height = `${this.h * 100}%`;
+
+        this.label.innerText = `X: ${(this.x*100).toFixed(1)}% Y: ${(this.y*100).toFixed(1)}%\nW: ${(this.w*100).toFixed(1)}% H: ${(this.h*100).toFixed(1)}%`;
+
+        this.handles.forEach(h => {
+            if (this.editing) h.classList.remove("hidden");
+            else h.classList.add("hidden");
+        });
+
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        if (this.enabled) {
+            video.style.left = `${this.x * 100}%`;
+            video.style.top = `${this.y * 100}%`;
+            video.style.width = `${this.w * 100}%`;
+            video.style.height = `${this.h * 100}%`;
+            canvas.style.left = `${this.x * 100}%`;
+            canvas.style.top = `${this.y * 100}%`;
+            canvas.style.width = `${this.w * 100}%`;
+            canvas.style.height = `${this.h * 100}%`;
+        } else {
+            video.style.left = "0";
+            video.style.top = "0";
+            video.style.width = "100%";
+            video.style.height = "100%";
+            canvas.style.left = "0";
+            canvas.style.top = "0";
+            canvas.style.width = "100%";
+            canvas.style.height = "100%";
+        }
+    }
+
+    initBoxDrag() {
+        let startX = 0, startY = 0;
+        let startBoxX = 0, startBoxY = 0;
+
+        const onPointerDown = (e: PointerEvent) => {
+            if (e.target !== this.overlay) return;
+            e.stopPropagation();
+            this.overlay.setPointerCapture(e.pointerId);
+            startX = e.clientX;
+            startY = e.clientY;
+            startBoxX = this.x;
+            startBoxY = this.y;
+        };
+
+        const onPointerMove = (e: PointerEvent) => {
+            if (!this.overlay.hasPointerCapture(e.pointerId)) return;
+            e.stopPropagation();
+            const rect = this.getMainRect();
+            const dx = (e.clientX - startX) / rect.width;
+            const dy = (e.clientY - startY) / rect.height;
+
+            this.x = Math.max(0, Math.min(1 - this.w, startBoxX + dx));
+            this.y = Math.max(0, Math.min(1 - this.h, startBoxY + dy));
+            this.updateDOM();
+            this.onUpdate();
+        };
+
+        const onPointerUp = (e: PointerEvent) => {
+            if (this.overlay.hasPointerCapture(e.pointerId)) {
+                this.overlay.releasePointerCapture(e.pointerId);
+            }
+        };
+
+        this.overlay.addEventListener("pointerdown", onPointerDown);
+        this.overlay.addEventListener("pointermove", onPointerMove);
+        this.overlay.addEventListener("pointerup", onPointerUp);
+        this.overlay.addEventListener("pointercancel", onPointerUp);
+    }
+
+    initHandleDrag(handle: HTMLDivElement, position: string) {
+        let startX = 0, startY = 0;
+        let startXVal = 0, startYVal = 0;
+        let startWVal = 0, startHVal = 0;
+
+        const onPointerDown = (e: PointerEvent) => {
+            e.stopPropagation();
+            handle.setPointerCapture(e.pointerId);
+            startX = e.clientX;
+            startY = e.clientY;
+            startXVal = this.x;
+            startYVal = this.y;
+            startWVal = this.w;
+            startHVal = this.h;
+        };
+
+        const onPointerMove = (e: PointerEvent) => {
+            if (!handle.hasPointerCapture(e.pointerId)) return;
+            e.stopPropagation();
+            const rect = this.getMainRect();
+            const dx = (e.clientX - startX) / rect.width;
+            const dy = (e.clientY - startY) / rect.height;
+
+            let newX = this.x;
+            let newY = this.y;
+            let newW = this.w;
+            let newH = this.h;
+
+            if (position.includes("l")) {
+                newX = Math.max(0, Math.min(startXVal + startWVal - 0.05, startXVal + dx));
+                newW = startWVal - (newX - startXVal);
+            } else if (position.includes("r")) {
+                newW = Math.max(0.05, Math.min(1 - this.x, startWVal + dx));
+            }
+
+            if (position.includes("t")) {
+                newY = Math.max(0, Math.min(startYVal + startHVal - 0.05, startYVal + dy));
+                newH = startHVal - (newY - startYVal);
+            } else if (position.includes("b")) {
+                newH = Math.max(0.05, Math.min(1 - this.y, startHVal + dy));
+            }
+
+            this.x = newX;
+            this.y = newY;
+            this.w = newW;
+            this.h = newH;
+            this.updateDOM();
+            this.onUpdate();
+        };
+
+        const onPointerUp = (e: PointerEvent) => {
+            if (handle.hasPointerCapture(e.pointerId)) {
+                handle.releasePointerCapture(e.pointerId);
+            }
+        };
+
+        handle.addEventListener("pointerdown", onPointerDown);
+        handle.addEventListener("pointermove", onPointerMove);
+        handle.addEventListener("pointerup", onPointerUp);
+        handle.addEventListener("pointercancel", onPointerUp);
+    }
+}
+
 class Settings {
     webSocket: WebSocket;
     checks: Map<string, HTMLInputElement>;
@@ -121,6 +314,12 @@ class Settings {
     visible: boolean;
     custom_input_areas: CustomInputAreas;
     settings: HTMLElement;
+    mappingBox: MappingBox;
+    mapping_presets: { [name: string]: { x: number, y: number, w: number, h: number } } = {};
+    preset_select: HTMLSelectElement;
+    delete_preset_btn: HTMLButtonElement;
+    toggle_edit_btn: HTMLButtonElement;
+    mapping_info: HTMLOutputElement;
 
     constructor(webSocket: WebSocket) {
         this.webSocket = webSocket;
@@ -152,6 +351,26 @@ class Settings {
         this.settings.querySelectorAll("input[type=checkbox]").forEach(
             (elem, _key, _parent) => this.checks.set(elem.id, elem as HTMLInputElement)
         );
+
+        // Mapping Area Init
+        this.preset_select = document.getElementById("mapping_preset") as HTMLSelectElement;
+        this.delete_preset_btn = document.getElementById("delete_mapping_preset") as HTMLButtonElement;
+        this.toggle_edit_btn = document.getElementById("toggle_mapping_edit") as HTMLButtonElement;
+        this.mapping_info = document.getElementById("mapping_info") as HTMLOutputElement;
+
+        this.mappingBox = new MappingBox(() => {
+            this.updateMappingInfo();
+            const val = this.preset_select.value;
+            if (val && val !== "__full" && val !== "__new") {
+                this.mapping_presets[val] = {
+                    x: this.mappingBox.x,
+                    y: this.mappingBox.y,
+                    w: this.mappingBox.w,
+                    h: this.mappingBox.h
+                };
+            }
+            this.save_settings();
+        });
 
         this.load_settings();
 
@@ -220,6 +439,64 @@ class Settings {
             this.save_settings();
         };
 
+        // Mapping Area Controls
+        this.checks.get("enable_mapping").onchange = (e) => {
+            this.mappingBox.enabled = (e.target as HTMLInputElement).checked;
+            this.save_settings();
+        };
+
+        this.toggle_edit_btn.onclick = () => {
+            this.mappingBox.editing = !this.mappingBox.editing;
+            this.toggle_edit_btn.innerText = this.mappingBox.editing ? "Done Editing" : "Edit Mapping Area";
+            this.mappingBox.updateDOM();
+            this.save_settings();
+        };
+
+        this.preset_select.onchange = () => {
+            const val = this.preset_select.value;
+            if (val === "__new") {
+                const name = window.prompt("Enter new preset name:");
+                if (name) {
+                    this.mapping_presets[name] = {
+                        x: this.mappingBox.x,
+                        y: this.mappingBox.y,
+                        w: this.mappingBox.w,
+                        h: this.mappingBox.h
+                    };
+                    this.rebuildPresetSelect(name);
+                    this.save_settings();
+                } else {
+                    this.rebuildPresetSelect("__full");
+                }
+                return;
+            }
+            if (val === "__full") {
+                this.mappingBox.x = 0;
+                this.mappingBox.y = 0;
+                this.mappingBox.w = 1;
+                this.mappingBox.h = 1;
+            } else if (this.mapping_presets[val]) {
+                const preset = this.mapping_presets[val];
+                this.mappingBox.x = preset.x;
+                this.mappingBox.y = preset.y;
+                this.mappingBox.w = preset.w;
+                this.mappingBox.h = preset.h;
+            }
+            this.mappingBox.updateDOM();
+            this.updateMappingInfo();
+            this.save_settings();
+        };
+
+        this.delete_preset_btn.onclick = () => {
+            const val = this.preset_select.value;
+            if (val && val !== "__full") {
+                delete this.mapping_presets[val];
+                this.rebuildPresetSelect("__full");
+                this.preset_select.dispatchEvent(new Event("change"));
+                this.save_settings();
+            }
+        };
+
         this.frame_rate_input.onchange = () => this.save_settings();
         this.range_min_pressure.onchange = () => this.save_settings();
 
@@ -254,6 +531,28 @@ class Settings {
         this.webSocket.send(JSON.stringify({ "Config": config }));
     }
 
+    updateMappingInfo() {
+        this.mapping_info.innerText = `X: ${(this.mappingBox.x*100).toFixed(1)}% Y: ${(this.mappingBox.y*100).toFixed(1)}%\nW: ${(this.mappingBox.w*100).toFixed(1)}% H: ${(this.mappingBox.h*100).toFixed(1)}%`;
+    }
+
+    rebuildPresetSelect(selectedName?: string) {
+        this.preset_select.innerHTML = '<option value="__full">Full Area</option>';
+        for (const name in this.mapping_presets) {
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.innerText = name;
+            this.preset_select.appendChild(opt);
+        }
+        const addNewOpt = document.createElement("option");
+        addNewOpt.value = "__new";
+        addNewOpt.innerText = "+ Add New Preset...";
+        this.preset_select.appendChild(addNewOpt);
+        
+        if (selectedName) {
+            this.preset_select.value = selectedName;
+        }
+    }
+
     save_settings() {
         let settings = Object(null);
         for (const [key, elem] of this.checks.entries())
@@ -263,6 +562,17 @@ class Settings {
         settings["min_pressure"] = this.range_min_pressure.value;
         settings["custom_input_areas"] = this.custom_input_areas;
         settings["client_name"] = this.client_name_input.value;
+
+        // Custom mapping settings
+        settings["mapping_box"] = {
+            x: this.mappingBox.x,
+            y: this.mappingBox.y,
+            w: this.mappingBox.w,
+            h: this.mappingBox.h
+        };
+        settings["mapping_presets"] = this.mapping_presets;
+        settings["mapping_active_preset"] = this.preset_select.value;
+
         localStorage.setItem("settings", JSON.stringify(settings));
     }
 
@@ -273,12 +583,17 @@ class Settings {
             this.frame_rate_output.value = (30).toString();
             let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
             this.scale_video_output.value = w + "x" + h;
+            
+            // Set some default presets
+            this.mapping_presets = {};
+            this.rebuildPresetSelect("__full");
+            this.updateMappingInfo();
             return;
         }
         try {
             let settings = JSON.parse(settings_string);
             for (const [key, elem] of this.checks.entries()) {
-                if (typeof settings[key] === "boolean")
+                if (elem && typeof settings[key] === "boolean")
                     elem.checked = settings[key];
             }
             let upd_limit = settings["frame_rate"];
@@ -329,8 +644,22 @@ class Settings {
             if (client_name)
                 this.client_name_input.value = client_name;
 
-        } catch {
-            log(LogLevel.DEBUG, "Failed to load settings.")
+            // Load mapping settings
+            this.mapping_presets = settings["mapping_presets"] || {};
+            this.rebuildPresetSelect(settings["mapping_active_preset"] || "__full");
+            const mb = settings["mapping_box"] || { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
+            this.mappingBox.x = mb.x;
+            this.mappingBox.y = mb.y;
+            this.mappingBox.w = mb.w;
+            this.mappingBox.h = mb.h;
+            this.mappingBox.enabled = settings["enable_mapping"] !== false;
+            if (this.checks.get("enable_mapping")) {
+                this.checks.get("enable_mapping").checked = this.mappingBox.enabled;
+            }
+            this.updateMappingInfo();
+
+        } catch (e) {
+            log(LogLevel.DEBUG, "Failed to load settings: " + e)
             return;
         }
     }
@@ -438,6 +767,9 @@ class PEvent {
             btn = 2;
         this.button = (btn < 0 ? 0 : 1 << btn);
         this.buttons = event.buttons;
+        let px = (event.clientX - targetRect.left) / targetRect.width;
+        let py = (event.clientY - targetRect.top) / targetRect.height;
+
         let x_offset = 0;
         let y_offset = 0;
         let x_scale = 1;
@@ -458,8 +790,8 @@ class PEvent {
                 y_offset = custom_input_area.y;
             }
         }
-        this.x = (event.clientX - targetRect.left) / targetRect.width * x_scale + x_offset;
-        this.y = (event.clientY - targetRect.top) / targetRect.height * y_scale + y_offset;
+        this.x = px * x_scale + x_offset;
+        this.y = py * y_scale + y_offset;
         // this.movement_x = event.movementX ? event.movementX : 0;
         // this.movement_y = event.movementY ? event.movementY : 0;
         this.pressure = Math.max(event.pressure, settings.range_min_pressure.valueAsNumber);
@@ -1081,6 +1413,9 @@ function init() {
         let [w, h] = calc_max_video_resolution(settings.scale_video_input.valueAsNumber);
         settings.scale_video_output.value = w + "x" + h;
         settings.send_server_config();
+        if (settings.mappingBox) {
+            settings.mappingBox.updateDOM();
+        }
     }
     video.controls = false;
     video.disableRemotePlayback = true;
@@ -1115,14 +1450,12 @@ function init() {
     frame_rate_stats();
 }
 
-// object-fit: fill; <-- this is unfortunately not supported on iOS, so we use the following
-// workaround
 function stretch_video() {
     let video = document.getElementById("video") as HTMLVideoElement;
+    video.style.transform = "none";
     if (settings.stretched_video()) {
-        video.style.transform = "scaleX(" + document.body.clientWidth / video.clientWidth + ") scaleY(" + document.body.clientHeight / video.clientHeight + ")";
+        video.style.objectFit = "fill";
     } else {
-        let scale = Math.min(document.body.clientWidth / video.clientWidth, document.body.clientHeight / video.clientHeight);
-        video.style.transform = "scale(" + scale + ")";
+        video.style.objectFit = "contain";
     }
 }

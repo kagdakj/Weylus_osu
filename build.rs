@@ -84,9 +84,11 @@ fn main() {
     if ["linux", "windows"].contains(&target_os.as_str()) {
         cc_video.define("HAS_NVENC", None);
     }
+    /*
     if target_os == "linux" {
         cc_video.define("HAS_VAAPI", None);
     }
+    */
     if target_os == "macos" {
         cc_video.define("HAS_VIDEOTOOLBOX", None);
     }
@@ -179,6 +181,7 @@ fn linux() {
     println!("cargo:rustc-link-lib=Xfixes");
     println!("cargo:rustc-link-lib=Xcomposite");
     println!("cargo:rustc-link-lib=Xi");
+    /*
     let va_link_kind = if env::var("CARGO_FEATURE_VA_STATIC").is_ok() {
         "static"
     } else {
@@ -189,6 +192,7 @@ fn linux() {
     println!("cargo:rustc-link-lib={}=va-x11", va_link_kind);
     println!("cargo:rustc-link-lib=drm");
     println!("cargo:rustc-link-lib=xcb-dri3");
+    */
     println!("cargo:rustc-link-lib=X11-xcb");
     println!("cargo:rustc-link-lib=xcb");
 }

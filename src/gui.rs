@@ -39,8 +39,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let mut wind = Window::default()
         .with_size(660, 600)
         .center_screen()
-        .with_label(&format!("Weylus - {}", env!("CARGO_PKG_VERSION")));
-    wind.set_xclass("weylus");
+        .with_label(&format!("Weylus_Osu - {}", env!("CARGO_PKG_VERSION")));
+    wind.set_xclass("weylus_osu");
     wind.set_callback(move |_win| app.quit());
 
     let mut input_access_code = Input::default()
@@ -49,8 +49,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .with_label("Access code");
     input_access_code.set_tooltip(
         "Restrict who can control your computer with an access code. Note that this does NOT do \
-        any kind of encryption and it is advised to only run Weylus inside trusted networks! Do \
-        NOT reuse any of your passwords! If left blank, no code is required to access Weylus \
+        any kind of encryption and it is advised to only run Weylus_Osu inside trusted networks! Do \
+        NOT reuse any of your passwords! If left blank, no code is required to access Weylus_Osu \
         remotely.",
     );
     if let Some(code) = config.access_code.as_ref() {
@@ -73,7 +73,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .with_size(70, height)
         .below_of(&input_port, padding + 5)
         .with_label("Auto Start");
-    check_auto_start.set_tooltip("Start Weylus server immediately on program start.");
+    check_auto_start.set_tooltip("Start Weylus_Osu server immediately on program start.");
     check_auto_start.set_checked(config.auto_start);
 
     #[cfg(target_os = "linux")]
@@ -148,9 +148,15 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         .below_of(&check_native_hw_accel, 2 * padding)
         .with_label("Start");
 
+    let mut but_adb = Button::default()
+        .with_size(width, height)
+        .below_of(&but_toggle, padding)
+        .with_label("Connect Android (ADB)");
+    but_adb.set_tooltip("Automatically forward ports 1701 and 9001 over USB using ADB.");
+
     let mut output_server_addr = Output::default()
         .with_size(500, height)
-        .below_of(&but_toggle, 3 * padding)
+        .below_of(&but_adb, 2 * padding)
         .with_label("Connect your\ntablet to:");
     output_server_addr.hide();
 
@@ -250,8 +256,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         let mut pop_up = Window::default()
                             .with_size(w, h)
                             .center_screen()
-                            .with_label("Weylus - UInput inaccessible!");
-                        pop_up.set_xclass("weylus");
+                            .with_label("Weylus_Osu - UInput inaccessible!");
+                        pop_up.set_xclass("weylus_osu");
 
                         let buf = TextBuffer::default();
                         let mut pop_up_text = TextDisplay::default().with_size(w, h);
@@ -376,6 +382,32 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     }
 
     but_toggle.set_callback(toggle_server);
+
+    but_adb.set_callback(|_| {
+        let cmd1 = std::process::Command::new("adb")
+            .args(&["reverse", "tcp:1701", "tcp:1701"])
+            .output();
+        let cmd2 = std::process::Command::new("adb")
+            .args(&["reverse", "tcp:9001", "tcp:9001"])
+            .output();
+
+        let mut msg = String::new();
+        match (cmd1, cmd2) {
+            (Ok(out1), Ok(out2)) => {
+                if out1.status.success() && out2.status.success() {
+                    msg = "ADB reverse successful! USB connection ready.\nConnect your tablet to http://localhost:1701".to_string();
+                } else {
+                    let err1 = String::from_utf8_lossy(&out1.stderr);
+                    let err2 = String::from_utf8_lossy(&out2.stderr);
+                    msg = format!("Failed to connect via ADB.\n{}\n{}", err1, err2);
+                }
+            }
+            (Err(e), _) | (_, Err(e)) => {
+                msg = format!("Error running adb (is it installed and in PATH?): {}", e);
+            }
+        }
+        fltk::dialog::message_default(&msg);
+    });
 
     app.run().expect("Failed to run Gui!");
 

@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>Weylus</title>
+    <title>Weylus_Osu</title>
     <link rel="stylesheet" href="style.css">
     <script src="lib.js"></script>
     <script>
@@ -30,9 +30,9 @@
                 <button id="refresh">Refresh List</button>
             </section>
             <h3>Video</h3>
-            <section>
-                <label><input type="checkbox" id="enable_video" checked /> <span>Enable Video</span></label>
-                <label><input type="checkbox" id="energysaving" /> <span>Energy Saving (no video, black
+            <section class="hide" id="video_section">
+                <label><input type="checkbox" id="enable_video" /> <span>Enable Video</span></label>
+                <label><input type="checkbox" id="energysaving" checked /> <span>Energy Saving (no video, black
                         screen)</span></label>
                 <label><input type="checkbox" id="stretch" checked /> <span>Stretch Video</span></label>
                 <button id="fullscreen">Toggle Fullscreen</button>
@@ -62,6 +62,19 @@
                 <label {{#if (not enable_custom_input_areas)}}class="hide" {{/if}}><input type="checkbox"
                         id="enable_custom_input_areas" /> <span>Enable Custom Input
                         Area</span></label>
+            </section>
+            <h3>Mapping Area</h3>
+            <section id="mapping_section" class="mapping-card">
+                <label class="switch-row"><input type="checkbox" id="enable_mapping" checked /> <span>Enable Mapping</span></label>
+                <button id="toggle_mapping_edit" class="btn-primary">Edit Mapping Area</button>
+                <div class="preset-controls">
+                    <select id="mapping_preset">
+                        <option value="__full">Full Area</option>
+                        <option value="__new">+ Add New Preset...</option>
+                    </select>
+                    <button id="delete_mapping_preset" class="icon-btn delete" title="Delete Preset">🗑️</button>
+                </div>
+                <output id="mapping_info" class="mapping-info-box"></output>
             </section>
             <section {{#if (not uinput_enabled)}}class="hide" {{/if}}>
                 <label><span>Client Name:</span><br><input type="text" id="client_name" /><br><span>Optional, useful to
