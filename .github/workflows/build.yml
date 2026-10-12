@@ -91,6 +91,8 @@ jobs:
 
   build-macos:
     strategy:
+      # let the other macOS build finish if one of them fails
+      fail-fast: false
       matrix:
         os: [macos-latest, macos-15-intel] # -latest is for Apple Silicon, -15-intel is for Intel
     runs-on: ${{ matrix.os }}
@@ -134,13 +136,6 @@ jobs:
         name: ${{ runner.os }}-ffbuild
         path: |
           deps/ffmpeg/ffbuild
-    - name: Debug via SSH
-      if: failure()
-      uses: luchihoratiu/debug-via-ssh@main
-      with:
-        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-        SSH_PASS: ${{ secrets.SSH_PASS }}
-        NGROK_REGION: eu
     - name: Publish
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
