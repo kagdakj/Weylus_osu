@@ -5,7 +5,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::AtomicBool;
 
 use fltk::app;
-use fltk::enums::{FrameType, LabelType};
+use fltk::enums::{Align, Font, FrameType, LabelType};
 use fltk::image::PngImage;
 use fltk::menu::Choice;
 use std::sync::{mpsc, Arc, Mutex};
@@ -25,17 +25,39 @@ use fltk::{
 #[cfg(not(target_os = "windows"))]
 use pnet_datalink as datalink;
 
-use crate::config::{write_config, Config, ThemeType};
+use crate::config::{write_config, Config};
 use crate::protocol::{CustomInputAreas, Rect};
 use crate::web::Web2UiMessage::UInputInaccessible;
 
+fn section_label(x: i32, y: i32, w: i32, text: &str) -> Frame {
+    let mut frame = Frame::default()
+        .with_pos(x, y)
+        .with_size(w, 25)
+        .with_label(text);
+    frame.set_label_font(Font::HelveticaBold);
+    frame.set_align(Align::Left | Align::Inside);
+    frame
+}
+
+/// Label on the left side of a row of check buttons, aligned like the labels of input fields.
+fn row_label(x: i32, y: i32, w: i32, text: &str) -> Frame {
+    let mut frame = Frame::default()
+        .with_pos(x, y)
+        .with_size(w, 25)
+        .with_label(text);
+    frame.set_align(Align::Right | Align::Inside);
+    frame
+}
+
 pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
-    let width = 200;
+    let label_width = 110;
+    let field_x = 20 + label_width;
+    let field_width = 200;
     let height = 30;
-    let padding = 10;
+    let right_x = 360;
+    let right_width = 280;
 
     let app = App::default().with_scheme(fltk::app::AppScheme::Gtk);
-    config.gui_theme.map(|th| th.apply());
     let mut wind = Window::default()
         .with_size(660, 600)
         .center_screen()
@@ -43,9 +65,13 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     wind.set_xclass("weylus_osu");
     wind.set_callback(move |_win| app.quit());
 
+    // Server settings, left column
+
+    section_label(20, 15, 310, "Server");
+
     let mut input_access_code = Input::default()
-        .with_pos(130, 30)
-        .with_size(width, height)
+        .with_pos(field_x, 45)
+        .with_size(field_width, height)
         .with_label("Access code");
     input_access_code.set_tooltip(
         "Restrict who can control your computer with an access code. Note that this does NOT do \
@@ -58,29 +84,31 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     }
 
     let mut input_bind_addr = Input::default()
-        .with_size(width, height)
-        .below_of(&input_access_code, padding)
-        .with_label("Bind Address");
+        .with_pos(field_x, 85)
+        .with_size(field_width, height)
+        .with_label("Bind address");
     input_bind_addr.set_value(&config.bind_address.to_string());
 
     let mut input_port = IntInput::default()
-        .with_size(width, height)
-        .below_of(&input_bind_addr, padding)
+        .with_pos(field_x, 125)
+        .with_size(field_width, height)
         .with_label("Port");
     input_port.set_value(&config.web_port.to_string());
 
+    row_label(20, 165, label_width - 10, "Options");
+
     let mut check_auto_start = CheckButton::default()
-        .with_size(70, height)
-        .below_of(&input_port, padding + 5)
-        .with_label("Auto Start");
+        .with_pos(field_x, 165)
+        .with_size(field_width, 25)
+        .with_label("Start server on launch");
     check_auto_start.set_tooltip("Start Weylus_Osu server immediately on program start.");
     check_auto_start.set_checked(config.auto_start);
 
     #[cfg(target_os = "linux")]
     let mut check_wayland = CheckButton::default()
-        .with_size(70, height)
-        .right_of(&check_auto_start, 3 * padding)
-        .with_label("Wayland/\nPipeWire\nSupport");
+        .with_pos(field_x, 192)
+        .with_size(field_width, 25)
+        .with_label("Wayland / PipeWire");
     #[cfg(target_os = "linux")]
     {
         check_wayland.set_tooltip(
@@ -90,27 +118,18 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
         check_wayland.set_checked(config.wayland_support);
     }
 
-    let mut label_hw_accel = Frame::default()
-        .with_size(width, height)
-        .below_of(&check_auto_start, padding)
-        .with_label("Try Hardware acceleration");
+    let mut label_hw_accel = row_label(20, 222, label_width - 10, "HW encoding");
     label_hw_accel.set_tooltip(
         "On many systems video encoding can be done with hardware \
         acceleration. By default this is disabled as the quality and stability of video encoding \
-        varies greatly among hardware and drivers. Currently this is only supported on Linux.",
+        varies greatly among hardware and drivers.",
     );
 
+    // VAAPI support is disabled in build.rs, so there is no native option on Linux.
+    #[cfg(not(target_os = "linux"))]
     let mut check_native_hw_accel = CheckButton::default()
-        .with_size(70, height)
-        .below_of(&label_hw_accel, 0);
-
-    #[cfg(target_os = "linux")]
-    {
-        check_native_hw_accel.set_label("VAAPI");
-        check_native_hw_accel
-            .set_tooltip("Try to use hardware acceleration through the Video Acceleration API.");
-        check_native_hw_accel.set_checked(config.try_vaapi);
-    }
+        .with_pos(field_x, 222)
+        .with_size(120, 25);
 
     #[cfg(target_os = "macos")]
     {
@@ -122,15 +141,20 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
     #[cfg(target_os = "windows")]
     {
-        check_native_hw_accel.set_label("Media-\nFoundation");
+        check_native_hw_accel.set_label("MediaFoundation");
         check_native_hw_accel
             .set_tooltip("Try to use hardware acceleration through the MediaFoundation API.");
         check_native_hw_accel.set_checked(config.try_mediafoundation);
     }
 
+    let nvenc_x = if cfg!(target_os = "windows") {
+        field_x + 130
+    } else {
+        field_x
+    };
     let mut check_nvenc = CheckButton::default()
-        .with_size(70, height)
-        .right_of(&check_native_hw_accel, 2 * padding)
+        .with_pos(nvenc_x, 222)
+        .with_size(80, 25)
         .with_label("NVENC");
     check_nvenc.set_tooltip("Try to use Nvidia's NVENC to encode the video via GPU.");
 
@@ -144,46 +168,54 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     }
 
     let mut but_toggle = Button::default()
-        .with_size(width, height)
-        .below_of(&check_native_hw_accel, 2 * padding)
+        .with_pos(20, 265)
+        .with_size(150, 36)
         .with_label("Start");
 
     let mut but_adb = Button::default()
-        .with_size(width, height)
-        .below_of(&but_toggle, padding)
-        .with_label("Connect Android (ADB)");
-    but_adb.set_tooltip("Automatically forward ports 1701 and 9001 over USB using ADB.");
+        .with_pos(180, 265)
+        .with_size(150, 36)
+        .with_label("Connect via USB");
+    but_adb.set_tooltip(
+        "Forward the server port to an Android tablet connected over USB using `adb reverse`. \
+        Requires adb in PATH and USB debugging enabled on the tablet.",
+    );
+
+    // Connection info, right column
+
+    section_label(right_x, 15, right_width, "Tablet");
+
+    let mut connect_hint = Frame::default()
+        .with_pos(right_x, 45)
+        .with_size(right_width, 240)
+        .with_label(
+            "Press Start, then scan the QR code\nor open the shown address\nin your tablet's browser.",
+        );
+    connect_hint.set_label_color(fltk::enums::Color::Inactive);
+
+    let mut qr_frame = Frame::default()
+        .with_pos(right_x + (right_width - 240) / 2, 45)
+        .with_size(240, 240);
+    qr_frame.hide();
 
     let mut output_server_addr = Output::default()
-        .with_size(500, height)
-        .below_of(&but_adb, 2 * padding)
-        .with_label("Connect your\ntablet to:");
+        .with_pos(right_x, 295)
+        .with_size(right_width, height);
     output_server_addr.hide();
 
+    // Log, grows with the window
+
+    section_label(20, 335, 620, "Log");
+
     let output_buf = TextBuffer::default();
-    let mut output = TextDisplay::default().with_size(600, 6 * height).with_pos(
-        30,
-        output_server_addr.y() + output_server_addr.height() + padding,
-    );
+    let mut output = TextDisplay::default()
+        .with_pos(20, 362)
+        .with_size(620, 220);
     output.set_buffer(output_buf);
     let output_buf = output.buffer().unwrap();
 
-    let mut choice_theme = Choice::default()
-        .with_size(width, height)
-        .right_of(&input_access_code, padding);
-
-    for theme in ThemeType::themes() {
-        choice_theme.add_choice(&theme.name());
-    }
-    choice_theme.set_value(config.gui_theme.unwrap_or(ThemeType::default()).to_index());
-
-    let mut qr_frame = Frame::default()
-        .with_size(235, 235)
-        .right_of(&input_bind_addr, padding);
-
-    qr_frame.hide();
-
-    wind.make_resizable(true);
+    wind.resizable(&output);
+    wind.size_range(660, 450, 0, 0);
     wind.end();
     wind.show();
 
@@ -200,18 +232,7 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
     let mut is_server_running = false;
     let auto_start = config.auto_start;
     let config = Arc::new(Mutex::new(config.clone()));
-
-    {
-        let config = config.clone();
-        choice_theme.set_callback(move |c| {
-            let v = c.value();
-            if v >= 0 {
-                ThemeType::from_index(v).apply();
-                config.lock().unwrap().gui_theme = Some(ThemeType::from_index(v));
-                write_config(&config.lock().unwrap());
-            }
-        });
-    }
+    let adb_port_input = input_port.clone();
 
     let mut toggle_server = move |but: &mut Button| {
         if let Err(err) = || -> Result<(), Box<dyn std::error::Error>> {
@@ -230,10 +251,8 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                     config.web_port = web_port;
                     config.bind_address = bind_addr;
                     config.auto_start = check_auto_start.is_checked();
-                    config.gui_theme = Some(ThemeType::from_index(choice_theme.value()));
                     #[cfg(target_os = "linux")]
                     {
-                        config.try_vaapi = check_native_hw_accel.is_checked();
                         config.wayland_support = check_wayland.is_checked();
                     }
                     #[cfg(any(target_os = "linux", target_os = "windows"))]
@@ -361,12 +380,14 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
                         output_server_addr.set_value(&format!("http://{}", web_sock.to_string()));
                     }
                 }
+                connect_hint.hide();
                 output_server_addr.show();
                 but.set_label("Stop");
             } else {
                 weylus.stop();
                 but.set_label("Start");
                 output_server_addr.hide();
+                connect_hint.show();
                 qr_frame.resize_callback(|_, _, _, _, _| {});
                 qr_frame.hide();
                 is_server_running = false;
@@ -383,29 +404,21 @@ pub fn run(config: &Config, log_receiver: mpsc::Receiver<String>) {
 
     but_toggle.set_callback(toggle_server);
 
-    but_adb.set_callback(|_| {
-        let cmd1 = std::process::Command::new("adb")
-            .args(&["reverse", "tcp:1701", "tcp:1701"])
-            .output();
-        let cmd2 = std::process::Command::new("adb")
-            .args(&["reverse", "tcp:9001", "tcp:9001"])
-            .output();
-
-        let mut msg = String::new();
-        match (cmd1, cmd2) {
-            (Ok(out1), Ok(out2)) => {
-                if out1.status.success() && out2.status.success() {
-                    msg = "ADB reverse successful! USB connection ready.\nConnect your tablet to http://localhost:1701".to_string();
-                } else {
-                    let err1 = String::from_utf8_lossy(&out1.stderr);
-                    let err2 = String::from_utf8_lossy(&out2.stderr);
-                    msg = format!("Failed to connect via ADB.\n{}\n{}", err1, err2);
-                }
-            }
-            (Err(e), _) | (_, Err(e)) => {
-                msg = format!("Error running adb (is it installed and in PATH?): {}", e);
-            }
-        }
+    but_adb.set_callback(move |_| {
+        let port = adb_port_input.value();
+        let msg = match std::process::Command::new("adb")
+            .args(["reverse", &format!("tcp:{port}"), &format!("tcp:{port}")])
+            .output()
+        {
+            Ok(out) if out.status.success() => format!(
+                "USB connection ready.\nOpen http://localhost:{port} in your tablet's browser."
+            ),
+            Ok(out) => format!(
+                "adb reverse failed:\n{}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            ),
+            Err(err) => format!("Failed to run adb (is it installed and in PATH?): {err}"),
+        };
         fltk::dialog::message_default(&msg);
     });
 

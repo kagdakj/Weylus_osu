@@ -78,10 +78,11 @@ function frame_rate_scale_inv(x: number) {
 }
 
 
-function calc_max_video_resolution(scale: number) {
+// frac_w and frac_h are the fraction of the window covered by the video (the tablet area).
+function calc_max_video_resolution(scale: number, frac_w: number = 1, frac_h: number = 1) {
     return [
-        Math.round(scale * window.innerWidth * window.devicePixelRatio),
-        Math.round(scale * window.innerHeight * window.devicePixelRatio)
+        Math.round(scale * frac_w * window.innerWidth * window.devicePixelRatio),
+        Math.round(scale * frac_h * window.innerHeight * window.devicePixelRatio)
     ];
 }
 
@@ -90,8 +91,23 @@ function fresh_canvas() {
     let canvas = document.createElement("canvas");
     canvas.id = canvas_old.id;
     canvas_old.classList.forEach((cls) => canvas.classList.add(cls));
+    // keep the position inside the tablet area
+    canvas.style.cssText = canvas_old.style.cssText;
     canvas_old.replaceWith(canvas);
     return canvas;
+}
+
+// Rect of the visible picture. If the video is not stretched it is letterboxed inside its
+// element, input has to be mapped to the picture and not to the element.
+function input_rect(elem: HTMLElement): DOMRect {
+    let rect = elem.getBoundingClientRect();
+    if (!(elem instanceof HTMLVideoElement) || settings.stretched_video()
+        || !elem.videoWidth || !elem.videoHeight)
+        return rect;
+    let scale = Math.min(rect.width / elem.videoWidth, rect.height / elem.videoHeight);
+    let w = elem.videoWidth * scale;
+    let h = elem.videoHeight * scale;
+    return new DOMRect(rect.left + (rect.width - w) / 2, rect.top + (rect.height - h) / 2, w, h);
 }
 
 class Rect {
@@ -108,19 +124,21 @@ class CustomInputAreas {
 }
 
 class MappingBox {
-    x: number = 0.1;
-    y: number = 0.1;
-    w: number = 0.8;
-    h: number = 0.8;
+    x: number = 0;
+    y: number = 0;
+    w: number = 1;
+    h: number = 1;
     editing: boolean = false;
     enabled: boolean = true;
     overlay: HTMLDivElement;
     handles: HTMLDivElement[] = [];
     label: HTMLDivElement;
     onUpdate: () => void;
+    onDone: () => void;
 
-    constructor(onUpdate: () => void) {
+    constructor(onUpdate: () => void, onDone: () => void) {
         this.onUpdate = onUpdate;
+        this.onDone = onDone;
         this.createOverlay();
     }
 
@@ -137,15 +155,19 @@ class MappingBox {
         this.label.id = "mapping_label";
         this.overlay.appendChild(this.label);
 
-        // Add handles
-        const positions = ["tl", "tr", "bl", "br"];
-        positions.forEach(pos => {
+        const done = document.createElement("button");
+        done.id = "mapping_done";
+        done.textContent = "Done";
+        done.onclick = (e) => { e.stopPropagation(); this.onDone(); };
+        this.overlay.appendChild(done);
+
+        for (const pos of ["tl", "tr", "bl", "br"]) {
             const handle = document.createElement("div");
             handle.className = `mapping_handle ${pos}`;
             this.overlay.appendChild(handle);
             this.handles.push(handle);
             this.initHandleDrag(handle, pos);
-        });
+        }
 
         this.initBoxDrag();
         // Append to main so it is positioned within the input area
@@ -153,49 +175,36 @@ class MappingBox {
         main.appendChild(this.overlay);
     }
 
+    describe(): string {
+        const pct = (v: number) => (v * 100).toFixed(1).padStart(5) + "%";
+        return `X ${pct(this.x)}   Y ${pct(this.y)}\nW ${pct(this.w)}   H ${pct(this.h)}`;
+    }
+
     updateDOM() {
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+
         if (!this.enabled) {
             this.overlay.className = "hidden";
         } else if (this.editing) {
             this.overlay.className = "editing";
         } else {
             this.overlay.className = "not-editing";
+            if (video.classList.contains("vanish"))
+                this.overlay.classList.add("no-video");
         }
 
-        // Position relative to the main element (100%/100% so just use percentages)
-        this.overlay.style.left = `${this.x * 100}%`;
-        this.overlay.style.top = `${this.y * 100}%`;
-        this.overlay.style.width = `${this.w * 100}%`;
-        this.overlay.style.height = `${this.h * 100}%`;
-
-        this.label.innerText = `X: ${(this.x*100).toFixed(1)}% Y: ${(this.y*100).toFixed(1)}%\nW: ${(this.w*100).toFixed(1)}% H: ${(this.h*100).toFixed(1)}%`;
-
-        this.handles.forEach(h => {
-            if (this.editing) h.classList.remove("hidden");
-            else h.classList.add("hidden");
-        });
-
-        const video = document.getElementById("video");
-        const canvas = document.getElementById("canvas");
-        if (this.enabled) {
-            video.style.left = `${this.x * 100}%`;
-            video.style.top = `${this.y * 100}%`;
-            video.style.width = `${this.w * 100}%`;
-            video.style.height = `${this.h * 100}%`;
-            canvas.style.left = `${this.x * 100}%`;
-            canvas.style.top = `${this.y * 100}%`;
-            canvas.style.width = `${this.w * 100}%`;
-            canvas.style.height = `${this.h * 100}%`;
-        } else {
-            video.style.left = "0";
-            video.style.top = "0";
-            video.style.width = "100%";
-            video.style.height = "100%";
-            canvas.style.left = "0";
-            canvas.style.top = "0";
-            canvas.style.width = "100%";
-            canvas.style.height = "100%";
+        // Position relative to the main element, which covers the whole window
+        const [x, y, w, h] = this.enabled ? [this.x, this.y, this.w, this.h] : [0, 0, 1, 1];
+        for (const elem of [this.overlay, video, canvas]) {
+            elem.style.left = `${x * 100}%`;
+            elem.style.top = `${y * 100}%`;
+            elem.style.width = `${w * 100}%`;
+            elem.style.height = `${h * 100}%`;
         }
+
+        this.label.textContent = this.describe();
+        this.handles.forEach(h => h.classList.toggle("hidden", !this.editing));
     }
 
     initBoxDrag() {
@@ -309,14 +318,16 @@ class Settings {
     scale_video_input: HTMLInputElement;
     scale_video_output: HTMLOutputElement;
     range_min_pressure: HTMLInputElement;
+    min_pressure_output: HTMLOutputElement;
     check_aggressive_seek: HTMLInputElement;
     client_name_input: HTMLInputElement;
     visible: boolean;
     custom_input_areas: CustomInputAreas;
     settings: HTMLElement;
     mappingBox: MappingBox;
-    mapping_presets: { [name: string]: { x: number, y: number, w: number, h: number } } = {};
+    mapping_presets: { [name: string]: Rect } = {};
     preset_select: HTMLSelectElement;
+    save_preset_btn: HTMLButtonElement;
     delete_preset_btn: HTMLButtonElement;
     toggle_edit_btn: HTMLButtonElement;
     mapping_info: HTMLOutputElement;
@@ -328,18 +339,15 @@ class Settings {
         this.frame_rate_input = document.getElementById("frame_rate") as HTMLInputElement;
         this.frame_rate_input.min = frame_rate_scale_inv(0).toString();
         this.frame_rate_input.max = frame_rate_scale_inv(120).toString();
-        this.frame_rate_output = this.frame_rate_input.nextElementSibling as HTMLOutputElement;
+        this.frame_rate_output = document.getElementById("frame_rate_value") as HTMLOutputElement;
         this.scale_video_input = document.getElementById("scale_video") as HTMLInputElement;
-        this.scale_video_output = this.scale_video_input.nextElementSibling as HTMLOutputElement;
+        this.scale_video_output = document.getElementById("scale_video_value") as HTMLOutputElement;
         this.range_min_pressure = document.getElementById("min_pressure") as HTMLInputElement;
+        this.min_pressure_output = document.getElementById("min_pressure_value") as HTMLOutputElement;
         this.client_name_input = document.getElementById("client_name") as HTMLInputElement;
-        this.frame_rate_input.oninput = () => {
-            this.frame_rate_output.value = Math.round(frame_rate_scale(this.frame_rate_input.valueAsNumber)).toString();
-        }
-        this.scale_video_input.oninput = () => {
-            let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
-            this.scale_video_output.value = w + "x" + h
-        }
+        this.frame_rate_input.oninput = () => this.update_frame_rate_output();
+        this.scale_video_input.oninput = () => this.update_scale_video_output();
+        this.range_min_pressure.oninput = () => this.update_min_pressure_output();
         this.visible = true;
 
         // Settings UI
@@ -352,37 +360,33 @@ class Settings {
             (elem, _key, _parent) => this.checks.set(elem.id, elem as HTMLInputElement)
         );
 
-        // Mapping Area Init
+        // Tablet area
         this.preset_select = document.getElementById("mapping_preset") as HTMLSelectElement;
+        this.save_preset_btn = document.getElementById("save_mapping_preset") as HTMLButtonElement;
         this.delete_preset_btn = document.getElementById("delete_mapping_preset") as HTMLButtonElement;
         this.toggle_edit_btn = document.getElementById("toggle_mapping_edit") as HTMLButtonElement;
         this.mapping_info = document.getElementById("mapping_info") as HTMLOutputElement;
 
         this.mappingBox = new MappingBox(() => {
-            this.updateMappingInfo();
-            const val = this.preset_select.value;
-            if (val && val !== "__full" && val !== "__new") {
-                this.mapping_presets[val] = {
-                    x: this.mappingBox.x,
-                    y: this.mappingBox.y,
-                    w: this.mappingBox.w,
-                    h: this.mappingBox.h
-                };
-            }
+            // the area is being dragged, keep the selected preset in sync
+            const name = this.preset_select.value;
+            if (this.is_preset(name))
+                this.mapping_presets[name] = this.mapping_rect();
+            else
+                this.preset_select.value = "__custom";
+            this.update_mapping_info();
             this.save_settings();
-        });
+        }, () => this.set_mapping_editing(false));
 
         this.load_settings();
+        this.mappingBox.updateDOM();
 
         // event handling
 
         // client only
         handle.onclick = () => { this.toggle() };
         this.checks.get("lefty").onchange = (e) => {
-            if ((e.target as HTMLInputElement).checked)
-                this.settings.classList.add("lefty");
-            else
-                this.settings.classList.remove("lefty");
+            this.settings.classList.toggle("lefty", (e.target as HTMLInputElement).checked);
             this.save_settings();
         }
 
@@ -396,12 +400,7 @@ class Settings {
         };
 
         this.checks.get("enable_debug_overlay").onchange = (e) => {
-            let enabled = (e.target as HTMLInputElement).checked;
-            if (enabled) {
-                debug_overlay.classList.remove("hide");
-            } else {
-                debug_overlay.classList.add("hide");
-            }
+            debug_overlay.classList.toggle("hide", !(e.target as HTMLInputElement).checked);
             this.save_settings();
         };
 
@@ -414,6 +413,7 @@ class Settings {
             let enabled = (e.target as HTMLInputElement).checked;
             document.getElementById("video").classList.toggle("vanish", !enabled);
             document.getElementById("canvas").classList.toggle("vanish", enabled);
+            this.mappingBox.updateDOM();
             this.save_settings();
             if (enabled) {
                 this.webSocket.send('"ResumeVideo"');
@@ -439,65 +439,45 @@ class Settings {
             this.save_settings();
         };
 
-        // Mapping Area Controls
+        // Tablet area controls
         this.checks.get("enable_mapping").onchange = (e) => {
             this.mappingBox.enabled = (e.target as HTMLInputElement).checked;
-            this.save_settings();
+            if (!this.mappingBox.enabled && this.mappingBox.editing)
+                this.set_mapping_editing(false);
+            this.on_mapping_changed();
         };
 
-        this.toggle_edit_btn.onclick = () => {
-            this.mappingBox.editing = !this.mappingBox.editing;
-            this.toggle_edit_btn.innerText = this.mappingBox.editing ? "Done Editing" : "Edit Mapping Area";
-            this.mappingBox.updateDOM();
-            this.save_settings();
-        };
+        this.toggle_edit_btn.onclick = () => this.set_mapping_editing(!this.mappingBox.editing);
 
         this.preset_select.onchange = () => {
-            const val = this.preset_select.value;
-            if (val === "__new") {
-                const name = window.prompt("Enter new preset name:");
-                if (name) {
-                    this.mapping_presets[name] = {
-                        x: this.mappingBox.x,
-                        y: this.mappingBox.y,
-                        w: this.mappingBox.w,
-                        h: this.mappingBox.h
-                    };
-                    this.rebuildPresetSelect(name);
-                    this.save_settings();
-                } else {
-                    this.rebuildPresetSelect("__full");
-                }
+            const name = this.preset_select.value;
+            if (name === "__full")
+                this.set_mapping_rect({ x: 0, y: 0, w: 1, h: 1 });
+            else if (this.is_preset(name))
+                this.set_mapping_rect(this.mapping_presets[name]);
+            this.delete_preset_btn.disabled = !this.is_preset(name);
+            this.on_mapping_changed();
+        };
+
+        this.save_preset_btn.onclick = () => {
+            const current = this.is_preset(this.preset_select.value) ? this.preset_select.value : "";
+            const name = window.prompt("Preset name:", current);
+            if (!name || name.startsWith("__"))
                 return;
-            }
-            if (val === "__full") {
-                this.mappingBox.x = 0;
-                this.mappingBox.y = 0;
-                this.mappingBox.w = 1;
-                this.mappingBox.h = 1;
-            } else if (this.mapping_presets[val]) {
-                const preset = this.mapping_presets[val];
-                this.mappingBox.x = preset.x;
-                this.mappingBox.y = preset.y;
-                this.mappingBox.w = preset.w;
-                this.mappingBox.h = preset.h;
-            }
-            this.mappingBox.updateDOM();
-            this.updateMappingInfo();
+            this.mapping_presets[name] = this.mapping_rect();
+            this.rebuild_preset_select(name);
             this.save_settings();
         };
 
         this.delete_preset_btn.onclick = () => {
-            const val = this.preset_select.value;
-            if (val && val !== "__full") {
-                delete this.mapping_presets[val];
-                this.rebuildPresetSelect("__full");
-                this.preset_select.dispatchEvent(new Event("change"));
+            const name = this.preset_select.value;
+            if (this.is_preset(name) && window.confirm(`Delete preset "${name}"?`)) {
+                delete this.mapping_presets[name];
+                this.rebuild_preset_select("__custom");
                 this.save_settings();
             }
         };
 
-        this.frame_rate_input.onchange = () => this.save_settings();
         this.range_min_pressure.onchange = () => this.save_settings();
 
         // server
@@ -522,7 +502,7 @@ class Settings {
             "uinput_support",
             "capture_cursor"])
             config[key] = this.checks.get(key).checked;
-        let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber);
+        let [w, h] = this.max_video_resolution();
         config["max_width"] = w;
         config["max_height"] = h;
         config["frame_rate"] = frame_rate_scale(this.frame_rate_input.valueAsNumber);
@@ -531,26 +511,82 @@ class Settings {
         this.webSocket.send(JSON.stringify({ "Config": config }));
     }
 
-    updateMappingInfo() {
-        this.mapping_info.innerText = `X: ${(this.mappingBox.x*100).toFixed(1)}% Y: ${(this.mappingBox.y*100).toFixed(1)}%\nW: ${(this.mappingBox.w*100).toFixed(1)}% H: ${(this.mappingBox.h*100).toFixed(1)}%`;
+    // The video only covers the tablet area, so there is no need to stream more pixels.
+    max_video_resolution() {
+        let box = this.mappingBox;
+        if (box && box.enabled)
+            return calc_max_video_resolution(this.scale_video_input.valueAsNumber, box.w, box.h);
+        return calc_max_video_resolution(this.scale_video_input.valueAsNumber);
     }
 
-    rebuildPresetSelect(selectedName?: string) {
-        this.preset_select.innerHTML = '<option value="__full">Full Area</option>';
-        for (const name in this.mapping_presets) {
+    update_scale_video_output() {
+        let [w, h] = this.max_video_resolution();
+        this.scale_video_output.value = w + "×" + h;
+    }
+
+    update_frame_rate_output() {
+        this.frame_rate_output.value = Math.round(frame_rate_scale(this.frame_rate_input.valueAsNumber)) + " fps";
+    }
+
+    update_min_pressure_output() {
+        this.min_pressure_output.value = Math.round(this.range_min_pressure.valueAsNumber * 100) + "%";
+    }
+
+    is_preset(name: string): boolean {
+        return !name.startsWith("__") && Object.prototype.hasOwnProperty.call(this.mapping_presets, name);
+    }
+
+    mapping_rect(): Rect {
+        return { x: this.mappingBox.x, y: this.mappingBox.y, w: this.mappingBox.w, h: this.mappingBox.h };
+    }
+
+    set_mapping_rect(r: Rect) {
+        this.mappingBox.x = r.x;
+        this.mappingBox.y = r.y;
+        this.mappingBox.w = r.w;
+        this.mappingBox.h = r.h;
+    }
+
+    // Called once the tablet area has been changed (not while dragging).
+    on_mapping_changed() {
+        this.mappingBox.updateDOM();
+        this.update_mapping_info();
+        this.update_scale_video_output();
+        this.save_settings();
+        if (this.webSocket.readyState == WebSocket.OPEN)
+            this.send_server_config();
+    }
+
+    set_mapping_editing(editing: boolean) {
+        this.mappingBox.editing = editing;
+        if (editing) {
+            this.mappingBox.enabled = true;
+            this.checks.get("enable_mapping").checked = true;
+            // get the panel out of the way
+            this.set_visible(false);
+        }
+        this.toggle_edit_btn.textContent = editing ? "Done" : "Edit Area";
+        this.on_mapping_changed();
+    }
+
+    update_mapping_info() {
+        this.mapping_info.value = this.mappingBox.describe();
+    }
+
+    rebuild_preset_select(selected: string) {
+        this.preset_select.textContent = "";
+        const add = (value: string, text: string) => {
             const opt = document.createElement("option");
-            opt.value = name;
-            opt.innerText = name;
+            opt.value = value;
+            opt.textContent = text;
             this.preset_select.appendChild(opt);
-        }
-        const addNewOpt = document.createElement("option");
-        addNewOpt.value = "__new";
-        addNewOpt.innerText = "+ Add New Preset...";
-        this.preset_select.appendChild(addNewOpt);
-        
-        if (selectedName) {
-            this.preset_select.value = selectedName;
-        }
+        };
+        add("__full", "Full screen");
+        for (const name of Object.keys(this.mapping_presets))
+            add(name, name);
+        add("__custom", "Custom");
+        this.preset_select.value = (selected === "__full" || this.is_preset(selected)) ? selected : "__custom";
+        this.delete_preset_btn.disabled = !this.is_preset(this.preset_select.value);
     }
 
     save_settings() {
@@ -562,38 +598,28 @@ class Settings {
         settings["min_pressure"] = this.range_min_pressure.value;
         settings["custom_input_areas"] = this.custom_input_areas;
         settings["client_name"] = this.client_name_input.value;
-
-        // Custom mapping settings
-        settings["mapping_box"] = {
-            x: this.mappingBox.x,
-            y: this.mappingBox.y,
-            w: this.mappingBox.w,
-            h: this.mappingBox.h
-        };
+        settings["mapping_box"] = this.mapping_rect();
         settings["mapping_presets"] = this.mapping_presets;
         settings["mapping_active_preset"] = this.preset_select.value;
-
         localStorage.setItem("settings", JSON.stringify(settings));
     }
 
     load_settings() {
-        let settings_string = localStorage.getItem("settings");
-        if (settings_string === null) {
+        let settings = null;
+        try {
+            settings = JSON.parse(localStorage.getItem("settings"));
+        } catch (e) {
+            log(LogLevel.DEBUG, "Failed to load settings: " + e);
+        }
+        if (!settings) {
             this.frame_rate_input.value = frame_rate_scale_inv(30).toString();
-            this.frame_rate_output.value = (30).toString();
-            let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber)
-            this.scale_video_output.value = w + "x" + h;
-            
-            // Set some default presets
-            this.mapping_presets = {};
-            this.rebuildPresetSelect("__full");
-            this.updateMappingInfo();
+            this.load_mapping(null);
+            this.update_outputs();
             return;
         }
         try {
-            let settings = JSON.parse(settings_string);
             for (const [key, elem] of this.checks.entries()) {
-                if (elem && typeof settings[key] === "boolean")
+                if (typeof settings[key] === "boolean")
                     elem.checked = settings[key];
             }
             let upd_limit = settings["frame_rate"];
@@ -601,13 +627,10 @@ class Settings {
                 this.frame_rate_input.value = frame_rate_scale_inv(upd_limit).toString();
             else
                 this.frame_rate_input.value = frame_rate_scale_inv(30).toString();
-            this.frame_rate_output.value = Math.round(frame_rate_scale(this.frame_rate_input.valueAsNumber)).toString();
 
             let scale_video = settings["scale_video"];
             if (scale_video)
                 this.scale_video_input.value = scale_video;
-            let [w, h] = calc_max_video_resolution(this.scale_video_input.valueAsNumber);
-            this.scale_video_output.value = w + "x" + h;
 
             let min_pressure = settings["min_pressure"];
             if (min_pressure)
@@ -635,7 +658,6 @@ class Settings {
                 debug_overlay.classList.remove("hide");
             }
 
-
             if (document.getElementById("custom_input_areas").classList.contains("hide")) {
                 this.checks.get("enable_custom_input_areas").checked = false;
             }
@@ -644,24 +666,33 @@ class Settings {
             if (client_name)
                 this.client_name_input.value = client_name;
 
-            // Load mapping settings
-            this.mapping_presets = settings["mapping_presets"] || {};
-            this.rebuildPresetSelect(settings["mapping_active_preset"] || "__full");
-            const mb = settings["mapping_box"] || { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
-            this.mappingBox.x = mb.x;
-            this.mappingBox.y = mb.y;
-            this.mappingBox.w = mb.w;
-            this.mappingBox.h = mb.h;
-            this.mappingBox.enabled = settings["enable_mapping"] !== false;
-            if (this.checks.get("enable_mapping")) {
-                this.checks.get("enable_mapping").checked = this.mappingBox.enabled;
-            }
-            this.updateMappingInfo();
-
+            this.load_mapping(settings);
         } catch (e) {
-            log(LogLevel.DEBUG, "Failed to load settings: " + e)
-            return;
+            log(LogLevel.DEBUG, "Failed to load settings: " + e);
         }
+        this.update_outputs();
+    }
+
+    load_mapping(settings: any) {
+        const valid = (r: any) => r && [r.x, r.y, r.w, r.h].every((v) => typeof v === "number");
+        this.mapping_presets = {};
+        let presets = settings && settings["mapping_presets"];
+        if (presets) {
+            for (const name of Object.keys(presets))
+                if (valid(presets[name]))
+                    this.mapping_presets[name] = presets[name];
+        }
+        if (settings && valid(settings["mapping_box"]))
+            this.set_mapping_rect(settings["mapping_box"]);
+        this.mappingBox.enabled = this.checks.get("enable_mapping").checked;
+        this.rebuild_preset_select(settings && settings["mapping_active_preset"] || "__full");
+    }
+
+    update_outputs() {
+        this.update_frame_rate_output();
+        this.update_scale_video_output();
+        this.update_min_pressure_output();
+        this.update_mapping_info();
     }
 
     stretched_video() {
@@ -680,8 +711,12 @@ class Settings {
     }
 
     toggle() {
-        this.settings.classList.toggle("hide");
-        this.visible = !this.visible;
+        this.set_visible(!this.visible);
+    }
+
+    set_visible(visible: boolean) {
+        this.settings.classList.toggle("hide", !visible);
+        this.visible = visible;
     }
 
     onCapturableList(window_names: string[]) {
@@ -767,8 +802,9 @@ class PEvent {
             btn = 2;
         this.button = (btn < 0 ? 0 : 1 << btn);
         this.buttons = event.buttons;
-        let px = (event.clientX - targetRect.left) / targetRect.width;
-        let py = (event.clientY - targetRect.top) / targetRect.height;
+        // pointer capture can report positions outside of the tablet area
+        let px = Math.min(Math.max((event.clientX - targetRect.left) / targetRect.width, 0), 1);
+        let py = Math.min(Math.max((event.clientY - targetRect.top) / targetRect.height, 0), 1);
 
         let x_offset = 0;
         let y_offset = 0;
@@ -878,13 +914,23 @@ class Painter {
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
-        canvas.width = window.innerWidth * window.devicePixelRatio;
-        canvas.height = window.innerHeight * window.devicePixelRatio;
+        this.syncSize();
         this.gl = canvas.getContext("webgl");
         if (this.gl) {
             this.lines_active = new Map();
             this.lines_old = [];
             this.setupWebGL();
+        }
+    }
+
+    // The canvas covers the tablet area which may be resized at any time, so keep its
+    // resolution in sync with its size on screen.
+    syncSize() {
+        let w = Math.round(this.canvas.clientWidth * window.devicePixelRatio);
+        let h = Math.round(this.canvas.clientHeight * window.devicePixelRatio);
+        if (w > 0 && h > 0 && (this.canvas.width != w || this.canvas.height != h)) {
+            this.canvas.width = w;
+            this.canvas.height = h;
         }
     }
 
@@ -939,6 +985,7 @@ class Painter {
                     this.lines_old.shift();
             }
             let gl = this.gl;
+            this.syncSize();
             gl.viewport(0, 0, this.canvas.width, this.canvas.height);
             gl.clear(gl.COLOR_BUFFER_BIT);
             gl.uniform1f(this.time_attr, performance.now());
@@ -965,9 +1012,11 @@ class Painter {
             line = [null, []];
             this.lines_active.set(event.pointerId, line)
         }
+        this.syncSize();
         let max_pixels = Math.max(this.canvas.width, this.canvas.height);
-        let x = event.clientX * window.devicePixelRatio / this.canvas.width * 2 - 1;
-        let y = 1 - event.clientY * window.devicePixelRatio / this.canvas.height * 2;
+        let rect = this.canvas.getBoundingClientRect();
+        let x = (event.clientX - rect.left) / rect.width * 2 - 1;
+        let y = 1 - (event.clientY - rect.top) / rect.height * 2;
         let delta = event.pressure + 0.4;
         let t = performance.now();
         // to draw a line segment, there has to be some previous position
@@ -1135,7 +1184,7 @@ class PointerHandler {
             }
         }
         if (this.pointerTypes.includes(event.pointerType)) {
-            let rect = (event.target as HTMLElement).getBoundingClientRect();
+            let rect = input_rect(event.target as HTMLElement);
             const events = event_type === "pointermove" && typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
             for (let event of events) {
                 this.webSocket.send(
@@ -1366,6 +1415,7 @@ function init() {
 
     debug_overlay = document.getElementById("debug_overlay");
     settings = new Settings(webSocket);
+    stretch_video();
 
     let video = document.getElementById("video") as HTMLVideoElement;
     let canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -1408,14 +1458,9 @@ function init() {
     webSocket.onclose = () => handle_disconnect("Connection closed.");
     window.onresize = () => {
         stretch_video();
-        canvas.width = window.innerWidth * window.devicePixelRatio;
-        canvas.height = window.innerHeight * window.devicePixelRatio;
-        let [w, h] = calc_max_video_resolution(settings.scale_video_input.valueAsNumber);
-        settings.scale_video_output.value = w + "x" + h;
+        settings.mappingBox.updateDOM();
+        settings.update_scale_video_output();
         settings.send_server_config();
-        if (settings.mappingBox) {
-            settings.mappingBox.updateDOM();
-        }
     }
     video.controls = false;
     video.disableRemotePlayback = true;
@@ -1452,10 +1497,5 @@ function init() {
 
 function stretch_video() {
     let video = document.getElementById("video") as HTMLVideoElement;
-    video.style.transform = "none";
-    if (settings.stretched_video()) {
-        video.style.objectFit = "fill";
-    } else {
-        video.style.objectFit = "contain";
-    }
+    video.style.objectFit = settings.stretched_video() ? "fill" : "contain";
 }

@@ -14,8 +14,7 @@ clap = { version = "4.5.18", features = ["derive"] }
 clap_complete = "4.5.29"
 dirs = "^5.0"
 fastwebsockets = { version = "0.8.0", features = ["upgrade", "unstable-split"] }
-fltk = { version = "^1.5", features = ["use-wayland", "fltk-bundled"] }
-fltk-theme = "^0.7.9"
+fltk = { version = "^1.5", features = ["use-wayland"] }
 handlebars = "^6.1"
 http-body-util = "0.1.2"
 hyper = { version = "^1.4", features = ["server", "http1", "http2"] }
@@ -57,6 +56,11 @@ core-foundation = "^0.10"
 core-graphics = "^0.24"
 
 [features]
+# Use prebuilt fltk libraries instead of compiling fltk with cmake. Release builds in CI disable
+# this with --no-default-features: the prebuilt libraries need a newer glibc than the build image
+# and there are none for musl.
+default = ["fltk-bundled"]
+fltk-bundled = ["fltk/fltk-bundled"]
 bench = []
 ffmpeg-system = []
 va-static = []
@@ -66,7 +70,8 @@ name = "Weylus_Osu"
 identifier = "io.github.h-m-h.weylus-osu"
 
 [package.metadata.deb]
-name = "Weylus_Osu"
+# Debian package names must be lowercase and must not contain underscores.
+name = "weylus-osu"
 section = "graphics"
 priority = "optional"
 assets = [

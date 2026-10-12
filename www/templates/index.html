@@ -21,81 +21,73 @@
         <div id="debug_overlay" class="hide"></div>
     </main>
     <div id="settings">
-        <div id="handle">⠿</div>
+        <div id="handle" title="Show / hide settings">⠿</div>
         <div id="settings_scroll">
-            <h2>Settings</h2>
-            <section>
-                <label for="window">Capture:</label>
-                <select id="window"></select>
-                <button id="refresh">Refresh List</button>
+            <header class="panel-header">
+                <h2>Weylus_Osu</h2>
+                <span class="fps"><output id="fps">0</output> fps</span>
+            </header>
+
+            <h3>Tablet Area</h3>
+            <section id="mapping_section">
+                <label class="row"><span>Enable tablet area</span><input type="checkbox" id="enable_mapping" checked /></label>
+                <div class="inline">
+                    <select id="mapping_preset"></select>
+                    <button id="save_mapping_preset" class="secondary" title="Save current area as preset">Save</button>
+                    <button id="delete_mapping_preset" class="secondary danger" title="Delete selected preset">Delete</button>
+                </div>
+                <output id="mapping_info" class="readout"></output>
+                <button id="toggle_mapping_edit">Edit Area</button>
             </section>
-            <h3>Video</h3>
-            <section class="hide" id="video_section">
-                <label><input type="checkbox" id="enable_video" /> <span>Enable Video</span></label>
-                <label><input type="checkbox" id="energysaving" checked /> <span>Energy Saving (no video, black
-                        screen)</span></label>
-                <label><input type="checkbox" id="stretch" checked /> <span>Stretch Video</span></label>
-                <button id="fullscreen">Toggle Fullscreen</button>
-                <label {{#if (not capture_cursor_enabled)}}class="hide" {{/if}}>
-                    <input type="checkbox" id="capture_cursor" />
-                    <span>Capture Cursor</span>
+
+            <h3>Screen</h3>
+            <section id="video_section">
+                <label class="stack"><span>Capture source</span>
+                    <div class="inline">
+                        <select id="window"></select>
+                        <button id="refresh" class="secondary" title="Refresh list">Refresh</button>
+                    </div>
                 </label>
-                <label><input type="checkbox" id="aggressive_seeking" checked /> <span>Lower Latency<br>(possibly
-                        choppy)</span></label>
-                <label>Max Video Resolution: <br><input type="range" id="scale_video" min="0.1" max="2" step="0.01"
-                        value="1.8" /><output></output></label>
-                <label>Frame Rate: <br><input type="range" id="frame_rate" value="0" /><output>30</output> fps</label>
+                <label class="row"><span>Show screen in tablet area</span><input type="checkbox" id="enable_video" checked /></label>
+                <label class="row"><span>Stretch to fill area</span><input type="checkbox" id="stretch" checked /></label>
+                <label class="row"><span>Low latency <small>(may stutter)</small></span><input type="checkbox" id="aggressive_seeking" checked /></label>
+                <label class="row {{#if (not capture_cursor_enabled)}}hide{{/if}}"><span>Capture cursor</span><input type="checkbox" id="capture_cursor" /></label>
+                <label class="row"><span>Energy saving <small>(black screen, no video)</small></span><input type="checkbox" id="energysaving" /></label>
+                <label class="stack"><span>Resolution <output id="scale_video_value" class="value"></output></span>
+                    <input type="range" id="scale_video" min="0.1" max="2" step="0.01" value="1.8" /></label>
+                <label class="stack"><span>Frame rate <output id="frame_rate_value" class="value">30</output></span>
+                    <input type="range" id="frame_rate" value="0" /></label>
+                <button id="fullscreen" class="secondary">Toggle Fullscreen</button>
             </section>
+
             <h3>Input</h3>
             <section>
-                <label><input type="checkbox" id="enable_mouse" checked /> <span>Enable Mouse</span></label>
-                <label><input type="checkbox" id="enable_stylus" checked /> <span>Enable Stylus</span></label>
-                <label><input type="checkbox" id="enable_touch" checked /> <span>Enable Touch</span></label>
-                <label {{#if (not uinput_enabled)}}class="hide" {{/if}}>
-                    <input type="checkbox" id="uinput_support" checked />
-                    <span>Enable uinput</span>
-                </label>
-                <label>Min pressure to generate: <br><input type="range" id="min_pressure" min="0" max="1" step="0.01"
-                        value="0" /></label>
-                <button id="custom_input_areas" {{#if (not enable_custom_input_areas)}}class="hide" {{/if}}>Custom Input
-                    Area</button>
-                <label {{#if (not enable_custom_input_areas)}}class="hide" {{/if}}><input type="checkbox"
-                        id="enable_custom_input_areas" /> <span>Enable Custom Input
-                        Area</span></label>
+                <label class="row"><span>Stylus</span><input type="checkbox" id="enable_stylus" checked /></label>
+                <label class="row"><span>Touch</span><input type="checkbox" id="enable_touch" checked /></label>
+                <label class="row"><span>Mouse</span><input type="checkbox" id="enable_mouse" checked /></label>
+                <label class="row {{#if (not uinput_enabled)}}hide{{/if}}"><span>Use uinput</span><input type="checkbox" id="uinput_support" checked /></label>
+                <label class="stack"><span>Minimum pressure <output id="min_pressure_value" class="value"></output></span>
+                    <input type="range" id="min_pressure" min="0" max="1" step="0.01" value="0" /></label>
+                <label class="row {{#if (not enable_custom_input_areas)}}hide{{/if}}"><span>Custom input area</span><input type="checkbox" id="enable_custom_input_areas" /></label>
+                <button id="custom_input_areas" class="secondary {{#if (not enable_custom_input_areas)}}hide{{/if}}">Choose Custom Input Area</button>
             </section>
-            <h3>Mapping Area</h3>
-            <section id="mapping_section" class="mapping-card">
-                <label class="switch-row"><input type="checkbox" id="enable_mapping" checked /> <span>Enable Mapping</span></label>
-                <button id="toggle_mapping_edit" class="btn-primary">Edit Mapping Area</button>
-                <div class="preset-controls">
-                    <select id="mapping_preset">
-                        <option value="__full">Full Area</option>
-                        <option value="__new">+ Add New Preset...</option>
-                    </select>
-                    <button id="delete_mapping_preset" class="icon-btn delete" title="Delete Preset">🗑️</button>
-                </div>
-                <output id="mapping_info" class="mapping-info-box"></output>
+
+            <h3>Advanced</h3>
+            <section>
+                <label class="stack {{#if (not uinput_enabled)}}hide{{/if}}"><span>Client name <small>(to tell devices apart)</small></span>
+                    <input type="text" id="client_name" /></label>
+                <label class="row"><span>Debug overlay</span><input type="checkbox" id="enable_debug_overlay" /></label>
             </section>
-            <section {{#if (not uinput_enabled)}}class="hide" {{/if}}>
-                <label><span>Client Name:</span><br><input type="text" id="client_name" /><br><span>Optional, useful to
-                        distinguish multiple devices.</span></label>
-            </section>
-            <section id="displayoptions">
-                <label id="leftylabel"><input type="checkbox" id="lefty" />Swap</label>
-                <label id="vanish">Hide until Reload</label>
-            </section>
-            <section id="stats_section">
-                <label><span>FPS (receiving): </span><output id="fps">0</output></label>
-            </section>
-            <section id="debug_section">
-                <label><input type="checkbox" id="enable_debug_overlay" /> <span>Debug
-                        Overlay</span></label>
-            </section>
+
             <section id="log_section" class="hide">
-                <label>Log
-                    <pre class="log" id="log" />
-                </label>
+                <h3>Log</h3>
+                <pre class="log" id="log"></pre>
             </section>
+
+            <footer id="displayoptions">
+                <label id="leftylabel"><input type="checkbox" id="lefty" /> <span>Panel on left</span></label>
+                <button id="vanish" class="secondary" title="Hide this panel until the page is reloaded">Hide until reload</button>
+            </footer>
         </div>
     </div>
 </body>

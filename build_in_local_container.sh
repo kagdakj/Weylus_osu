@@ -11,4 +11,4 @@ podman exec weylus_build sh -c "mkdir /weylus && tar xf archive.tar.gz --directo
 
 podman run --replace -d --name weylus_build_alpine hhmhh/weylus_build_alpine:latest sleep infinity
 podman cp docker/archive.tar.gz weylus_build_alpine:/
-podman exec weylus_build_alpine sh -c "mkdir /weylus && tar xf archive.tar.gz --directory=/weylus && cd weylus && RUSTFLAGS='-C target-feature=-crt-static' cargo build --release"
+podman exec weylus_build_alpine sh -c "mkdir /weylus && tar xf archive.tar.gz --directory=/weylus && cd weylus && RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --no-default-features"

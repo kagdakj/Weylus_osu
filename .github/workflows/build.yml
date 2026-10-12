@@ -32,25 +32,25 @@ jobs:
       uses: actions/upload-artifact@v6
       with:
         name: linux
-        path: packages/weylus-linux.zip
+        path: packages/weylus_osu-linux.zip
     - name: Artifacts2
       uses: actions/upload-artifact@v6
       with:
         name: linux-deb
-        path: packages/Weylus*.deb
+        path: packages/weylus-osu*.deb
     - name: Artifacts3
       uses: actions/upload-artifact@v6
       with:
         name: windows
-        path: packages/weylus-windows.zip
+        path: packages/weylus_osu-windows.zip
     - name: Publish
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
           files: |
-            packages/weylus-linux.zip
-            packages/Weylus*.deb
-            packages/weylus-windows.zip
+            packages/weylus_osu-linux.zip
+            packages/weylus-osu*.deb
+            packages/weylus_osu-windows.zip
           prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,19 +72,19 @@ jobs:
           target
         key: ${{ runner.os }}-alpine-cargo-${{ hashFiles('Cargo.lock') }}
     - name: Build
-      run: RUSTFLAGS='-C target-feature=-crt-static' cargo build --release && cd target/release && tar czf weylus-linux-alpine-musl.tar.gz weylus
+      run: RUSTFLAGS='-C target-feature=-crt-static' cargo build --release --no-default-features && cd target/release && tar czf weylus_osu-linux-alpine-musl.tar.gz weylus_osu
       shell: bash
     - name: Artifacts1
       uses: actions/upload-artifact@v6
       with:
         name: linux-alpine-musl
-        path: target/release/weylus-linux-alpine-musl.tar.gz
+        path: target/release/weylus_osu-linux-alpine-musl.tar.gz
     - name: Publish
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
           files: |
-            target/release/weylus-linux-alpine-musl.tar.gz
+            target/release/weylus_osu-linux-alpine-musl.tar.gz
           prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,14 +99,15 @@ jobs:
     - uses: actions/cache@v5
       with:
         path: deps/dist
-        key: ${{ runner.os }}-deps-${{ hashFiles('deps/*.sh', 'deps/*.patch') }}
+        # arm and intel runners both report macOS, include the architecture to keep caches apart
+        key: ${{ runner.os }}-${{ runner.arch }}-deps-${{ hashFiles('deps/*.sh', 'deps/*.patch') }}
     - uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-cargo-${{ hashFiles('Cargo.lock') }}
     - name: Download deps
       run: |
         npm install -g typescript
@@ -118,9 +119,9 @@ jobs:
       run: cargo bundle --release
     - name: Package
       run: |
-        MACOS_BUILD_NAME=macos-$([ "${{ matrix.os }}" == "macos-latest" ] && echo "arm" || echo "intel")
+        MACOS_BUILD_NAME=weylus_osu-macos-$([ "${{ matrix.os }}" == "macos-latest" ] && echo "arm" || echo "intel")
         echo "MACOS_BUILD_NAME=$MACOS_BUILD_NAME" >> $GITHUB_ENV
-        cd target/release/bundle/osx/ && zip -r ${MACOS_BUILD_NAME}.zip Weylus.app
+        cd target/release/bundle/osx/ && zip -r ${MACOS_BUILD_NAME}.zip Weylus_Osu.app
     - name: Artifacts
       uses: actions/upload-artifact@v6
       with:
@@ -145,7 +146,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       with:
           files: |
-            target/release/bundle/osx/macOS.zip
+            target/release/bundle/osx/${{ env.MACOS_BUILD_NAME }}.zip
           prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

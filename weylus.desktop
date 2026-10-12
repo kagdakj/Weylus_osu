@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=Weylus
-Comment=Use your tablet as graphic tablet/touch screen on your computer.
-TryExec=weylus
-Exec=weylus
+Name=Weylus_Osu
+Comment=Use your tablet as an osu! tablet with a custom mapping area.
+TryExec=weylus_osu
+Exec=weylus_osu
 Terminal=false
 Icon=input-tablet
 Categories=Office;Graphics;Education;Presentation;
-StartupWMClass=weylus
+StartupWMClass=weylus_osu
