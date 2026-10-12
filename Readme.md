@@ -1,13 +1,16 @@
-# Weylus
+# Weylus_Osu
 ![Build](https://github.com/H-M-H/Weylus/workflows/Build/badge.svg)
+
+**Weylus_Osu** is a fork of [Weylus](https://github.com/H-M-H/Weylus) by
+[H-M-H](https://github.com/H-M-H), tuned for playing [osu!](https://osu.ppy.sh) with a tablet or
+smart phone. All credit for Weylus itself goes to its original author and contributors, see
+[Credits](#credits). Unless stated otherwise, everything below about Weylus applies to Weylus_Osu
+as well.
 
 Weylus turns your tablet or smart phone into a graphic tablet/touch screen for your computer!
 
-Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
-
-![Weylus in action](In_action.gif)
-
 ## Table of Contents
+* [What's new in Weylus_Osu](#whats-new-in-weylus_osu)
 * [Features](#features)
 * [Installation](#installation)
     * [Packages](#packages)
@@ -33,6 +36,30 @@ Weylus in action with [Xournal++](https://github.com/xournalpp/xournalpp):
     * [Stylus/Touch](#stylustouch)
     * [Screen mirroring & window capturing](#screen-mirroring--window-capturing)
 * [FAQ](#faq)
+* [Credits](#credits)
+
+## What's new in Weylus_Osu
+- **Tablet area:** choose which part of the tablet screen is mapped to your computer screen, like
+  the active area of a graphic tablet. Drag and resize it directly on the tablet with "Edit Area",
+  and save it as a named preset.
+- **Screen inside the tablet area:** the screen of your computer is shown inside the tablet area,
+  so what you see under the pen is exactly where the cursor goes. The video resolution follows the
+  size of the area.
+- **Redesigned tablet page:** settings are grouped into Tablet Area, Screen, Input and Advanced
+  with switches and live values, and the panel moves out of the way while editing the area.
+- **Simpler desktop window:** server settings, connection info (QR code and address) and the log
+  are laid out in clear sections. The theme selector has been removed.
+- **Connect via USB:** a button that runs `adb reverse` for the configured port, so Android tablets
+  can connect over USB at `http://localhost:1701`.
+- On Linux, VAAPI hardware encoding is disabled in this build; NVENC is still available.
+
+Weylus_Osu is started with `weylus_osu` instead of `weylus` and stores its configuration in
+`weylus_osu/weylus_osu.toml` inside your config directory.
+
+<!-- Screenshots: tablet page and desktop window, e.g.
+![Tablet page](docs/tablet.png)
+![Desktop window](docs/desktop.png)
+-->
 
 ## Features
 - Control your mouse with your tablet
@@ -50,7 +77,8 @@ features on Linux are:
 
 ## Installation
 Just grab the latest release for your OS from the
-[releases page](https://github.com/H-M-H/Weylus/releases) and install it on your computer. No apps
+[releases page](https://github.com/H-M-H/Weylus/releases) and install it on your computer.
+Weylus_Osu builds are published on the [releases page](../../releases) of this repository. No apps
 except a modern browser (Firefox 80+, iOS/iPadOS 13+) are required on your tablet. **If you run
 Linux make sure to follow the instructions described [here](#linux) to enable uinput for features
 like pressure sensitivity and multitouch!**
@@ -89,7 +117,7 @@ supported.
 ### Automation
 Weylus provides some features to make automation as convenient as possible. There is a command-line
 interface; `--no-gui` for example starts Weylus in headless mode without a gui. For more options see
-`weylus --help`. If you want to run a specific script e.g., once a client connects to your computer
+`weylus_osu --help`. If you want to run a specific script e.g., once a client connects to your computer
 you can do so by parsing the log Weylus generates. You may want to enable more verbose logging by
 setting the environment variable `WEYLUS_LOG_LEVEL` to `DEBUG` or `TRACE` as well as
 `WEYLUS_LOG_JSON` to `true` to enable easily parseable JSON logging.
@@ -102,7 +130,7 @@ permanently writable by your user, run:
 sudo groupadd -r uinput
 sudo usermod -aG uinput $USER
 echo 'KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"' \
-| sudo tee /etc/udev/rules.d/60-weylus.rules
+| sudo tee /etc/udev/rules.d/60-weylus-osu.rules
 ```
 
 Then, either reboot, or run
@@ -115,7 +143,7 @@ sudo udevadm trigger
 then log out and log in again. To undo this, run:
 
 ```sh
-sudo rm /etc/udev/rules.d/60-weylus.rules
+sudo rm /etc/udev/rules.d/60-weylus-osu.rules
 ```
 
 This allows your user to synthesize input events system-wide, even when another user is logged in.
@@ -135,6 +163,8 @@ There are still some things that do not work:
 - capturing the cursor
 
 #### Hardware Acceleration
+*Weylus_Osu: VAAPI is currently disabled at build time (see `build.rs`), only NVENC is available.*
+
 On Linux Weylus supports hardware accelerated video encoding through the Video Acceleration API
 (VAAPI) or Nvidia's NVENC. By default hardware acceleration is disabled as quality and stability of
 the hardware encoded video stream varies widely among different hardware and sufficient quality can
@@ -283,6 +313,10 @@ After npm is installed, typescript must be installed by:
 sudo npm install typescript -g
 ```
 
+Weylus_Osu uses prebuilt fltk libraries by default (the `fltk-bundled` feature), as building fltk
+from source requires cmake 3.28 or newer. Pass `--no-default-features` to build fltk from source
+instead; this is what the release builds do.
+
 Note that building for the first time may take a while as by default ffmpeg needs to be built. On
 Windows only msvc is supported as C compiler; it is, however, possible to cross compile on Linux for
 Windows using minGW.
@@ -323,7 +357,7 @@ root@f02164dbfa18:/Weylus# cargo deb
 Once the build is finished you can for example copy the binary from the container to your file
 system like this:
 ```sh
-docker cp f02164dbfa18:/Weylus/target/release/weylus ~/some/path/weylus
+docker cp f02164dbfa18:/Weylus/target/release/weylus_osu ~/some/path/weylus_osu
 ```
 The .deb is located at `/Weylus/target/debian/`.  Please note that the container ID will most likely
 not be `f02164dbfa18` if you run this yourself, replace it accordingly.
@@ -400,6 +434,14 @@ Like that you can connect from your Android device to Weylus with the URL: `http
 
 Weylus only requires that your devices
 are connected via the Internet Protocol and that doesn't necessarily imply WiFi.
+
+In Weylus_Osu the "Connect via USB" button in the desktop window runs `adb reverse` for you.
+
+## Credits
+Weylus_Osu is based on [Weylus](https://github.com/H-M-H/Weylus), created by
+[H-M-H](https://github.com/H-M-H) (HMH, henry@freedesk.net) with help from its
+[contributors](CONTRIBUTORS). Like Weylus, Weylus_Osu is licensed under the
+[GNU AGPL v3.0 or later](LICENSE).
 
 ---
 

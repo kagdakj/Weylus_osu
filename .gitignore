@@ -10,3 +10,4 @@ c_helper/Cargo.lock
 *.js
 *.js.map
 *.tar.gz
+.idea/
